@@ -1,6 +1,8 @@
 import http from "http";
 import fs from "fs/promises";
 import { Command } from "commander";
+import { XMLBuilder } from "fast-xml-parser";
+import url from "url";
 
 const program = new Command();
 
@@ -14,18 +16,56 @@ const options = program.opts();
 
 async function readData(path) {
   try {
-    const data = await fs.readFile(path, "utf8");
-    return data;
+    const raw = await fs.readFile(path, "utf8");
+
+    let records;
+    if (raw.trim().startsWith("[")) {
+      records = JSON.parse(raw);
+    } else {
+      records = raw
+        .trim()
+        .split(/\r?\n/)
+        .filter(line => line)
+        .map(line => JSON.parse(line));
+    }
+
+    return records;
   } catch {
     throw new Error("Cannot find input file");
   }
 }
 
+
 const server = http.createServer(async (req, res) => {
   try {
-    await readData(options.input);
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Сервер працює, файл знайдено ");
+    const query = url.parse(req.url, true).query;
+
+    const irisData = await readData(options.input);
+
+    let filtered = irisData;
+    if (query.min_petal_length) {
+      const minLen = parseFloat(query.min_petal_length);
+      filtered = filtered.filter(
+        f => f?.petal?.length > minLen
+      );
+    }
+
+    const result = filtered.map(f => {
+      const obj = {
+        petal_length: f?.petal?.length ?? null,
+        petal_width: f?.petal?.width ?? null
+      };
+      if (query.variety === "true") {
+        obj.variety = f?.variety ?? null;
+      }
+      return obj;
+    });
+
+    const builder = new XMLBuilder({ format: true });
+    const xml = builder.build({ irises: { flower: result } });
+
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(xml);
   } catch (err) {
     res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
     res.end(err.message);
