@@ -1,5 +1,5 @@
 import http from "http";
-import fs from "fs/promises";
+import fs from "fs/promises"; //працює через асинхронні проміси (не колбеки)
 import { Command } from "commander";
 import { XMLBuilder } from "fast-xml-parser";
 import url from "url";
@@ -12,13 +12,13 @@ program
   .requiredOption("-p, --port <port>", "порт сервера");
 
 program.parse(process.argv);
-const options = program.opts();
+const options = program.opts(); //повертає всі зчитані опції у вигляді об’єкта
 
 async function readData(path) {
   try {
     const raw = await fs.readFile(path, "utf8");
 
-    let records;
+    let records; //cтворює змінну records, у яку далі збережено вже розібрані дані
     if (raw.trim().startsWith("[")) {
       records = JSON.parse(raw);
     } else {
