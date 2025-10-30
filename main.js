@@ -18,15 +18,25 @@ async function readData(path) {
   try {
     const raw = await fs.readFile(path, "utf8");
 
-    const records = raw //-----
-      .trim()
-      .split(/\r?\n/)
-      .filter(line => line)
-      .map(line => JSON.parse(line));
+    const text = raw.replace(/^\uFEFF/, "");
+
+    let records;
+    if (text.trim().startsWith("[")) {
+      records = JSON.parse(text.trim());
+    } 
+   
+    else {
+      records = text
+        .split(/\r?\n/)                
+        .map(line => line.trim())      
+        .filter(line => line.length > 0) 
+        .map(line => JSON.parse(line));  
+    }
 
     return records;
-  } catch {
-    throw new Error("Cannot find input file");
+  } catch (err) {
+    console.error("Помилка читання або парсингу:", err.message);
+    throw new Error("Помилка при зчитуванні або розборі файлу");
   }
 }
 
@@ -38,21 +48,24 @@ const server = http.createServer(async (req, res) => {
     const irisData = await readData(options.input);
 
     let filtered = irisData;
-    if (query.min_petal_length) {
-      const minLen = parseFloat(query.min_petal_length);
-      filtered = filtered.filter(f => f["petal.length"] > minLen);
-    }
 
-    const result = filtered.map(f => {
-      const obj = {
-        petal_length: f["petal.length"],
-        petal_width: f["petal.width"],
-      };
-      if (query.variety === "true") {
-        obj.variety = f.variety;
-      }      
-      return obj;
-    });
+if (query.min_petal_length) {
+  const minLen = parseFloat(query.min_petal_length);
+  
+  filtered = filtered.filter(f => f["petal.length"] > minLen);
+}
+
+const result = filtered.map(f => {
+  const obj = {
+    petal_length: f["petal.length"],
+    petal_width: f["petal.width"]
+  };
+  if (query.variety === "true") {
+    obj.variety = f["variety"];
+  }
+  return obj;
+});
+
 
     const builder = new XMLBuilder({ format: true });
     const xml = builder.build({ irises: { flower: result } });
@@ -66,6 +79,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(options.port, options.host, () => {
- console.log(`Сервер запущено на http://${options.host}:${options.port}`);
-
+  console.log(`Сервер запущено на http://${options.host}:${options.port}`);
 });
