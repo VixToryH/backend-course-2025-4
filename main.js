@@ -18,16 +18,11 @@ async function readData(path) {
   try {
     const raw = await fs.readFile(path, "utf8");
 
-    let records; //cтворює змінну records, у яку далі збережено вже розібрані дані
-    if (raw.trim().startsWith("[")) {
-      records = JSON.parse(raw);
-    } else {
-      records = raw
-        .trim()
-        .split(/\r?\n/)
-        .filter(line => line)
-        .map(line => JSON.parse(line));
-    }
+    const records = raw //-----
+      .trim()
+      .split(/\r?\n/)
+      .filter(line => line)
+      .map(line => JSON.parse(line));
 
     return records;
   } catch {
@@ -45,19 +40,17 @@ const server = http.createServer(async (req, res) => {
     let filtered = irisData;
     if (query.min_petal_length) {
       const minLen = parseFloat(query.min_petal_length);
-      filtered = filtered.filter(
-        f => f?.petal?.length > minLen
-      );
+      filtered = filtered.filter(f => f["petal.length"] > minLen);
     }
 
     const result = filtered.map(f => {
       const obj = {
-        petal_length: f?.petal?.length ?? null,
-        petal_width: f?.petal?.width ?? null
+        petal_length: f["petal.length"],
+        petal_width: f["petal.width"],
       };
       if (query.variety === "true") {
-        obj.variety = f?.variety ?? null;
-      }
+        obj.variety = f.variety;
+      }      
       return obj;
     });
 
@@ -73,5 +66,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(options.port, options.host, () => {
-  console.log(`Сервер запущено на http://${options.host}:${options.port}`);
+ console.log(`Сервер запущено на http://${options.host}:${options.port}`);
+
 });
